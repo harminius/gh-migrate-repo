@@ -1,0 +1,103 @@
+CheckConstraint('(service_id, customer_billing_id) IN (SELECT service_id, customer_billing_id FROM your_table)', name='check_service_customer_combination')
+
+A,
+service table - constraint
+customer_billing_id
+- null 
+- is in service_history
+... write to service_history before commit to service
+
+
+CREATE OR REPLACE FUNCTION check_billing_id_exists()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NEW.customer_billing_id IS NOT NULL THEN
+        -- Check if there is different customer_billing_id associated with the service_id in the service_history table
+        IF EXISTS (
+            SELECT 1
+            FROM service_history sh
+            WHERE sh.service_id = NEW.service_id
+			  AND sh.customer_billing_id IS NOT NULL
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+        ) THEN
+            RAISE EXCEPTION 'Service already had different customer_billing_id';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_billing_id_exists
+BEFORE UPDATE OF customer_billing_id ON service
+BEFORE INSERT ON service
+FOR EACH ROW
+EXECUTE FUNCTION check_billing_id_exists();
+
+implementation:
+customer_billing_id_constraint = DDL(
+        """ CREATE OR REPLACE FUNCTION check_billing_id_exists()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NEW.customer_billing_id IS NOT NULL THEN
+        -- Check if there is different customer_billing_id associated with the service_id in the service_history table
+        IF EXISTS (
+            SELECT 1
+            FROM service_history sh
+            WHERE sh.service_id = NEW.service_id
+			  AND sh.customer_billing_id IS NOT NULL
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+        ) THEN
+            RAISE EXCEPTION 'Service already had different customer_billing_id';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_billing_id_exists
+BEFORE INSERT OR UPDATE OF customer_billing_id ON service
+FOR EACH ROW
+EXECUTE PROCEDURE check_billing_id_exists();"""
+    )
+
+B,
+service_history table - constraint
+- null ok
+- if service_id already - customer_billing_id
+... before_commit signal to write to service_history
+
+
+CREATE OR REPLACE FUNCTION validate_customer_billing_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.customer_billing_id IS NOT NULL THEN
+        IF EXISTS (
+            SELECT 1 FROM service_history sh
+            WHERE sh.service_id = NEW.service_id
+              AND sh.customer_billing_id IS NOT NULL
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+        ) THEN
+            RAISE EXCEPTION 'Service already had different customer_billing_id';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_customer_billing_id_constraint
+BEFORE INSERT ON service_history
+FOR EACH ROW
+EXECUTE FUNCTION validate_customer_billing_id();
+
+
+
+ALTER TABLE service
+ADD CONSTRAINT history_customer_billing_id_check CHECK(check_history_cus_billing_id(service) = 1);
+
+
+
+
