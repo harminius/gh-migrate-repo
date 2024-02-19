@@ -1,0 +1,5 @@
+select array_length(readers, 1) AS readers_count, name, id, readers
+from workspace
+where array_length(readers, 1) > 1
+order by readers_count desc
+limit 100
