@@ -1,0 +1,67 @@
+@celery.task
+def check_subscriptions():
+    """Synchronise service status and plan with 3rd party billing services (Stripe)
+    State should be consistently set by webhooks, this is consistency check in case of missed events.
+    This task iterates over active services with possible outcomes:
+    - change plan according to Stripe
+    - deactivate service if inactive or no Stripe subscription is found
+    """
+    db.session.info = {"msg": "check_subscriptions"}
+    services = (
+        Service.query.join(Plan)
+        .filter(
+            Service.status == ServiceStatus.ACTIVE.value,
+            Service.customer_billing_id.isnot(None),
+            Plan.type == PlanType.STRIPE.value,
+            # Service.plan_id == 4,
+            # Service.customer_billing_id == "cus_OsTk5gcEOWVntk",
+            # cus_OsTOsg42943Yfm cus_NlsYl9Kk2YNIxf
+        )
+        .all()
+    )
+    # print("Plan_id: 4 (Individual) \n56 services in total in DB")
+    print("The rest of services")
+    i = 0
+    for service in services:
+        i = i + 1
+        print(f"\n{i}: service_id {service.id} found")
+        try:
+            stripe_customer = stripe.Customer.retrieve(service.customer_billing_id)
+            print(f"customer_billing_id: {stripe_customer.id}")
+        except stripe.error.InvalidRequestError as e:
+            print("! customer not found")
+            msg = f"Could not fetch Customer object for {service.customer_billing_id}: {str(e)}"
+            notify_event(service.id, NotificationEvent.STRIPE_API_FAILURE, msg)
+            continue
+        if "deleted" in stripe_customer:
+            print("customer deleted in stripe test mode :(")
+            continue
+        if len(stripe_customer.subscriptions.data):
+            subscription = stripe_customer.subscriptions.data[0]
+            if is_active_stripe_subscription(subscription["status"]):
+                # we have active service, just verify correct plan is assigned
+                plan = _get_plan_from_subscription(subscription)
+                if not plan:
+                    print(f"! no plan found in stripe")
+                    notify_event(
+                        service.id,
+                        NotificationEvent.STRIPE_API_FAILURE,
+                        "No matching plan to Stripe product",
+                    )
+                    continue
+                if service.plan != plan:
+                    service.plan = plan
+                    print(f"plan mismatch (probably legacy plan which is not available) -> changed in mergin")
+                else:
+                    print(f"all correct :)")
+                    continue  # all correct
+            else:
+                # inactive in stripe means inactive in mergin
+                service.status = ServiceStatus.INACTIVE.value
+                print(f"! inactive in stripe -> deactivated in mergin")
+        else:
+            # no subscription means inactive
+            service.status = ServiceStatus.INACTIVE.value
+            print("no subscription in stripe (deleted in test mode) -> deactivated in mergin")
+        service.last_modified_by = "celery_check_subscriptions"
+        db.session.commit()
