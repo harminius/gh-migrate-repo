@@ -1,0 +1,7 @@
+"id","workspace_id","plan_id","status","customer_billing_id","limits_override","last_modified_by","created"
+1,2,1,"active",NULL,"{}","mergin-app","2024-02-14 14:05:56.736568"
+2,3,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:31.965442"
+3,4,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:41.461572"
+4,5,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:50.037599"
+5,6,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:58.784587"
+6,7,1,"active",NULL,"{}","mergin-app","2024-02-14 14:08:26.898273"

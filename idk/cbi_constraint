@@ -1,0 +1,158 @@
+CREATE TABLE employees (
+  id SERIAL PRIMARY KEY, 
+  first_name VARCHAR (50) NOT NULL, 
+  last_name VARCHAR (50) NOT NULL,  
+  birth_date DATE NOT NULL, 
+  joined_date DATE NOT NULL, 
+  salary numeric CHECK(salary > 0)
+);
+
+INSERT INTO employees (first_name, last_name, birth_date, joined_date, salary) 
+VALUES ('John', 'Doe', '1972-01-01', '2015-07-01', -100000);
+
+CREATE TABLE service_history (
+  id SERIAL PRIMARY KEY, 
+  service_id numeric (50) NOT NULL, 
+  customer_billing_id VARCHAR (50)
+);
+
+CREATE TABLE service (
+  id SERIAL PRIMARY KEY, 
+  plan_id numeric (50) NOT NULL, 
+  customer_billing_id VARCHAR (50)
+);
+
+insert into service_history(service_id, customer_billing_id)
+values(2, Null)
+, (3, 'cus333')
+
+
+CREATE OR REPLACE FUNCTION validate_customer_billing_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.customer_billing_id IS NOT NULL THEN
+        IF EXISTS (
+            SELECT 1 FROM service_history sh
+            WHERE sh.service_id = NEW.service_id
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+        ) THEN
+            RAISE EXCEPTION 'Invalid customer_billing_id';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_customer_billing_id_constraint
+BEFORE INSERT ON service_history
+FOR EACH ROW
+EXECUTE FUNCTION validate_customer_billing_id();
+
+BEFORE UPDATE OF customer_billing_id ON service_history
+
+SELECT 1 FROM service_history sh
+            WHERE sh.service_id = 2
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+
+
+
+CREATE OR REPLACE FUNCTION check_billing_id_exists()
+RETURNS TRIGGER AS
+$$
+BEGIN
+    IF NEW.customer_billing_id IS NOT NULL THEN
+        -- Check if there is different customer_billing_id associated with the service_id in the service_history table
+        IF EXISTS (
+            SELECT 1
+            FROM service_history sh
+            WHERE sh.service_id = NEW.service_id
+			  AND sh.customer_billing_id IS NOT NULL
+              AND sh.customer_billing_id IS DISTINCT FROM NEW.customer_billing_id
+        ) THEN
+            RAISE EXCEPTION 'Service already had different customer_billing_id';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_billing_id_exists
+BEFORE UPDATE OF customer_billing_id ON service
+BEFORE INSERT ON service
+FOR EACH ROW
+EXECUTE FUNCTION check_billing_id_exists();
+
+
+CREATE OR REPLACE FUNCTION check_customer_billing_id_history(service record)
+RETURNS BOOLEAN AS
+$$
+BEGIN
+    IF service.customer_billing_id IS NOT NULL THEN
+        -- Check if there is different customer_billing_id associated with the service_id in the service_history table
+        IF EXISTS (
+            SELECT 1
+            FROM service_history sh
+            WHERE sh.service_id = service.id
+			  AND sh.customer_billing_id IS NOT NULL
+              AND sh.customer_billing_id IS DISTINCT FROM service.customer_billing_id
+        ) THEN
+            RETURN False;
+        END IF;
+    END IF;
+    RETURN True;
+END;
+$$
+LANGUAGE plpgsql;
+
+ALTER TABLE service
+ADD CONSTRAINT check_customtomer_billing_id_exists 
+CHECK (check_customer_billing_id_history(service));
+	
+	
+CASE
+	WHEN customer_billing_id IS NOT NULL 
+		THEN customer_billing_id IN 
+			(SELECT customer_billing_id FROM service_history sh WHERE id = sh.service_id)
+	ELSE true
+END
+);
+
+
+CONSTRAINT granted_until_sensible CHECK (
+		CASE
+			WHEN granted_until IS NOT NULL THEN
+				granted_until > granted
+				AND CASE
+					WHEN manual_access_grant_reason = 'teacher' OR manual_access_grant_reason = 'small_ngo' THEN granted_until <= granted + '3 years'::interval
+					WHEN manual_access_grant_reason = 'student' THEN granted_until <= granted + '1 year'::interval
+					WHEN manual_access_grant_reason = 'grace_period' THEN granted_until <= granted + '28 days'::interval
+					ELSE true
+				END
+			ELSE  -- granted_until must be NULL
+				manual_access_grant_reason::text = ANY(ARRAY[
+					'friend',
+					'partner',
+					'staff'
+				])
+		END
+	)
+);
+
+
+select *
+from service
+
+select *
+from service_history
+
+update service
+set plan_id = 3
+where id = 4
+
+update service
+set customer_billing_id = Null
+where id = 4
+
+insert into service
+values(4, 3, Null)

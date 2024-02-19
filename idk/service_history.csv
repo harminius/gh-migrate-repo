@@ -1,0 +1,7 @@
+"id","service_id","plan_id","status","customer_billing_id","limits_override","last_modified_by","created"
+7,2,1,"active",NULL,"{}","mergin-app","2024-02-14 14:05:56.736568"
+8,3,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:31.965442"
+9,4,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:41.461572"
+10,5,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:50.037599"
+11,6,1,"active",NULL,"{}","mergin-app","2024-02-14 14:06:58.784587"
+12,1,1,"active",NULL,"{}","mergin-app","2024-02-14 14:08:26.898273"
